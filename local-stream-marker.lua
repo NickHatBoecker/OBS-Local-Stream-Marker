@@ -6,7 +6,7 @@ output_file_name 				= "obs-marker.csv";
 output_file_name_custom			= "obs-marker-[date]";
 output_file_extension			= "%.csv$";
 output_folder 					= "";
-output_datetime_format			= "%Y-%m-%d_%H-%m";
+output_datetime_format			= "%Y-%m-%d_%H-%M";
 output_use_custom_filename		= true;
 
 -- Available variables for `output_format`:
@@ -22,8 +22,8 @@ output_use_custom_filename		= true;
 -- $recording_file_timestamp
 -- $recording_file_mark_end_timestamp
 --
-csv_headers 					= "Stream Start, Stream Time, Stream End Mark Time, Rec Full Path Filename, Rec Time, Rec End Mark Time, Rec Time on File, Rec End Mark Time on File";
-output_format 					= "$stream_start_time, $stream_timestamp, $stream_mark_end_timestamp, $recording_path, $recording_timestamp, $recording_mark_end_timestamp, $recording_file_timestamp, $recording_file_mark_end_timestamp";
+csv_headers                     = "Rec Time, Rec File";
+output_format                   = "$recording_timestamp, $recording_path";
 recording_path					= "";
 recording_filename 				= "";
 
@@ -434,6 +434,11 @@ end
 function script_load(settings)
 	obs.obs_frontend_add_event_callback(on_event);
     marker_hotkey_id = obs.obs_hotkey_register_frontend("marker_hotkey", "[Local Stream Marker] Add stream mark", hotkey_pressed)
+
+    -- @TODO cut marker
+    -- @TODO round start
+    -- @TODO round end
+
     marker_hotkey_end_id = obs.obs_hotkey_register_frontend("marker_end_hotkey", "[Local Stream Marker] Mark end", hotkey_end_pressed)
     local marker_hotkey_save_array = obs.obs_data_get_array(settings, "marker_hotkey")
     obs.obs_hotkey_load(marker_hotkey_id, marker_hotkey_save_array)	
