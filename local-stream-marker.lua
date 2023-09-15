@@ -2,15 +2,28 @@
 
 obs 							= obslua
 
-output_file_name 				= "obs-local-stream-marker.csv";
-output_file_name_custom			= "obs-local-stream-marker [date]";
+output_file_name 				= "obs-marker.csv";
+output_file_name_custom			= "obs-marker-[date]";
 output_file_extension			= "%.csv$";
 output_folder 					= "";
-output_datetime_format			= "%Y-%m-%d";
-output_use_custom_filename		= false;
+output_datetime_format			= "%Y-%m-%d_%H-%m";
+output_use_custom_filename		= true;
 
-csv_headers 					= "Date Time, Stream Start, Stream Timestamp, Stream End Mark Timestamp, Recording Full Path, Recording Filename, Recording Timestamp, Recording End Mark Timestamp, Recording Timestamp on File, Recording End Mark Timestamp on File";
-output_format 					= "$current_time, $stream_start_time, $stream_timestamp, $stream_mark_end_timestamp, $recording_path, $recording_filename, $recording_timestamp, $recording_mark_end_timestamp, $recording_file_timestamp, $recording_file_mark_end_timestamp";
+-- Available variables for `output_format`:
+--
+-- $current_time
+-- $stream_start_time
+-- $stream_timestamp
+-- $stream_mark_end_timestamp
+-- $recording_path
+-- $recording_filename
+-- $recording_timestamp
+-- $recording_mark_end_timestamp
+-- $recording_file_timestamp
+-- $recording_file_mark_end_timestamp
+--
+csv_headers 					= "Stream Start, Stream Time, Stream End Mark Time, Rec Full Path Filename, Rec Time, Rec End Mark Time, Rec Time on File, Rec End Mark Time on File";
+output_format 					= "$stream_start_time, $stream_timestamp, $stream_mark_end_timestamp, $recording_path, $recording_timestamp, $recording_mark_end_timestamp, $recording_file_timestamp, $recording_file_mark_end_timestamp";
 recording_path					= "";
 recording_filename 				= "";
 
@@ -28,7 +41,10 @@ marker_hotkey_id 				= obs.OBS_INVALID_HOTKEY_ID
 marker_hotkey_end_id			= obs.OBS_INVALID_HOTKEY_ID
 
 video_info 						= nil
+
+-- will be determined automatically
 framerate 						= 30
+
 stream_output 					= nil
 recording_output 				= nil
 signal_handler 					= nil
