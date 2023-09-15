@@ -21,9 +21,10 @@ output_use_custom_filename		= true;
 -- $recording_mark_end_timestamp
 -- $recording_file_timestamp
 -- $recording_file_mark_end_timestamp
+-- $stream_marker_type
 --
-csv_headers                     = "Rec Time, Rec File";
-output_format                   = "$recording_timestamp, $recording_path";
+csv_headers                     = "Rec Time, Type, Rec File";
+output_format                   = "$recording_timestamp, $stream_marker_type, $recording_path";
 recording_path					= "";
 recording_filename 				= "";
 
@@ -36,9 +37,13 @@ recording_file_mark_end_timestamp = "n/a";
 recording_file_frame_count 		= 0
 recording_frame_count_on_split 	= 0
 stream_start_time 				= "n/a";
+stream_marker_type				= "";
 
 marker_hotkey_id 				= obs.OBS_INVALID_HOTKEY_ID
 marker_hotkey_end_id			= obs.OBS_INVALID_HOTKEY_ID
+marker_hotkey_cut_id			= obs.OBS_INVALID_HOTKEY_ID
+marker_hotkey_round_start_id	= obs.OBS_INVALID_HOTKEY_ID
+marker_hotkey_round_end_id		= obs.OBS_INVALID_HOTKEY_ID
 
 video_info 						= nil
 
@@ -135,9 +140,14 @@ end
 
 
 
-function mark_stream()
+function mark_stream(markerType)
+	markerType = markerType or "";
+
 	local stream_elapsed_time_sec = 0;
 	local recording_elapsed_time_sec = 0;
+
+
+	stream_marker_type = markerType
 
 	-- if streaming
 	if obs.obs_frontend_streaming_active() then
@@ -192,53 +202,6 @@ function mark_stream()
 end
 
 
-function mark_end_stream()
-	local stream_elapsed_time_sec = 0;
-	local recording_elapsed_time_sec = 0;
-
-	-- if streaming
-	if obs.obs_frontend_streaming_active() then
-		-- double-check stream output
-		if stream_output ~= nil then
-			local stream_frame_count = obs.obs_output_get_total_frames(stream_output);
-			stream_elapsed_time_sec = stream_frame_count / framerate
-		end
-
-		-- get streaming timestamp
-		local stream_elapsed_hour = string.format("%02d", math.floor(stream_elapsed_time_sec / 3600));
-		local stream_elapsed_minute = string.format("%02d", math.floor((stream_elapsed_time_sec % 3600) / 60));
-		local stream_elapsed_second = string.format("%02d", math.floor(stream_elapsed_time_sec % 60));
-		stream_mark_end_timestamp = string.format("%s:%s:%s", stream_elapsed_hour, stream_elapsed_minute, stream_elapsed_second);
-	end
-
-	-- if recording
-	if obs.obs_frontend_recording_active() then
-		-- double-check recording output
-		if recording_output ~= nil then
-			local recording_frame_count = obs.obs_output_get_total_frames(recording_output);
-			recording_file_frame_count = recording_frame_count - recording_frame_count_on_split
-			recording_elapsed_time_sec = recording_frame_count / framerate
-			recording_file_elapsed_time_sec = recording_file_frame_count / framerate
-		end
-
-		-- get recording timestamp
-		local recording_elapsed_hour = string.format("%02d", math.floor(recording_elapsed_time_sec / 3600));
-		local recording_elapsed_minute = string.format("%02d", math.floor((recording_elapsed_time_sec % 3600) / 60));
-		local recording_elapsed_second = string.format("%02d", math.floor(recording_elapsed_time_sec % 60));
-		recording_mark_end_timestamp = string.format("%s:%s:%s", recording_elapsed_hour, recording_elapsed_minute, recording_elapsed_second);
-
-		-- get recording FILE timestamp (will differ from above if Automatic File Splitting is enabled)
-		local recording_file_elapsed_hour = string.format("%02d", math.floor(recording_file_elapsed_time_sec / 3600));
-		local recording_file_elapsed_minute = string.format("%02d", math.floor((recording_file_elapsed_time_sec % 3600) / 60));
-		local recording_file_elapsed_second = string.format("%02d", math.floor(recording_file_elapsed_time_sec % 60));
-		recording_file_mark_end_timestamp = string.format("%s:%s:%s", recording_file_elapsed_hour, recording_file_elapsed_minute, recording_file_elapsed_second);
-	end
-
-	write_line_to_file(string_to_csv_row(output_format), true);
-	return true;
-end
-
-
 
 function string_to_csv_row(text_to_process)
 	local processed = text_to_process;
@@ -253,24 +216,34 @@ function string_to_csv_row(text_to_process)
 	processed = processed:gsub("$recording_mark_end_timestamp", recording_mark_end_timestamp);
 	processed = processed:gsub("$recording_file_timestamp", recording_file_timestamp);
 	processed = processed:gsub("$recording_file_mark_end_timestamp", recording_file_mark_end_timestamp);
+	processed = processed:gsub("$stream_marker_type", stream_marker_type);
 
 	return processed;
 end
 
-
-
-function hotkey_pressed(pressed)
-	if not pressed then
-		return
-	end
-    mark_stream()
+function on_hotkey_cut_pressed(pressed)
+	hotkey_pressed(pressed, "CUT")
 end
 
-function hotkey_end_pressed(pressed)
+function on_hotkey_round_start_pressed(pressed)
+	hotkey_pressed(pressed, "ROUND START")
+end
+
+function on_hotkey_round_end_pressed(pressed)
+	hotkey_pressed(pressed, "ROUND END")
+end
+
+function on_default_hotkey_pressed(pressed)
+	hotkey_pressed(pressed, "HIGHLIGHT")
+end
+
+
+
+function hotkey_pressed(pressed, markerType)
 	if not pressed then
 		return
 	end
-    mark_end_stream()
+    mark_stream(markerType)
 end
 
 
@@ -340,12 +313,13 @@ function get_framerate()
 	end
 end
 
+
 function get_filename_from_path(path)
 	return path:match("^.+/(.+)$")
 end
 
 
-
+-- Settings properties
 function script_properties()
 	local properties = obs.obs_properties_create();
 
@@ -382,7 +356,7 @@ function script_properties()
 end
 
 
-
+-- Show script description
 function script_description()
 	return [[
 <h2>Local Stream Marker v1.8</h2>
@@ -401,7 +375,7 @@ function script_description()
 end
 
 
-
+-- On script reload
 function script_update(settings)
 	output_folder = obs.obs_data_get_string(settings, "output_folder")
 	output_file_name_custom = obs.obs_data_get_string(settings, "output_file_name_custom")
@@ -411,6 +385,8 @@ function script_update(settings)
 	print("[Local Stream Marker] Script reloaded")
 end
 
+
+-- Set settings defaults
 function script_defaults(settings)
 	obs.obs_data_set_default_string(settings, "output_file_name_custom", output_file_name_custom)
 	obs.obs_data_set_default_bool(settings, "output_use_custom_filename", false)
@@ -418,7 +394,7 @@ function script_defaults(settings)
 end
 
 
-
+-- On save settings?
 function script_save(settings)
     local marker_hotkey_save_array = obs.obs_hotkey_save(marker_hotkey_id)
     obs.obs_data_set_array(settings, "marker_hotkey", marker_hotkey_save_array)
@@ -427,23 +403,43 @@ function script_save(settings)
     local marker_hotkey_end_array = obs.obs_hotkey_save(marker_hotkey_end_id)
     obs.obs_data_set_array(settings, "marker_end_hotkey", marker_hotkey_end_array)
     obs.obs_data_array_release(marker_hotkey_end_array)
+
+    local marker_hotkey_cut_array = obs.obs_hotkey_save(marker_hotkey_cut_id)
+    obs.obs_data_set_array(settings, "marker_hotkey_cut", marker_hotkey_cut_array)
+    obs.obs_data_array_release(marker_hotkey_cut_array)
+
+    local marker_hotkey_round_start_array = obs.obs_hotkey_save(marker_hotkey_round_start_id)
+    obs.obs_data_set_array(settings, "marker_hotkey_round_start", marker_hotkey_round_start_array)
+    obs.obs_data_array_release(marker_hotkey_round_start_array)
+
+    local marker_hotkey_round_end_array = obs.obs_hotkey_save(marker_hotkey_round_end_id)
+    obs.obs_data_set_array(settings, "marker_hotkey_round_end", marker_hotkey_round_end_array)
+    obs.obs_data_array_release(marker_hotkey_round_end_array)
 end
 
 
-
+-- On load settings?
 function script_load(settings)
 	obs.obs_frontend_add_event_callback(on_event);
-    marker_hotkey_id = obs.obs_hotkey_register_frontend("marker_hotkey", "[Local Stream Marker] Add stream mark", hotkey_pressed)
 
-    -- @TODO cut marker
-    -- @TODO round start
-    -- @TODO round end
+    marker_hotkey_id = obs.obs_hotkey_register_frontend("marker_hotkey", "[Local Stream Marker] Add stream mark", on_default_hotkey_pressed)
+    marker_hotkey_cut_id = obs.obs_hotkey_register_frontend("marker_hotkey_cut", "[Local Stream Marker] Add stream mark:: Cut", on_hotkey_cut_pressed)
+    marker_hotkey_round_start_id = obs.obs_hotkey_register_frontend("marker_hotkey_round_start", "[Local Stream Marker] Add stream mark:: Round start", on_hotkey_round_start_pressed)
+    marker_hotkey_round_end_id = obs.obs_hotkey_register_frontend("marker_hotkey_round_end", "[Local Stream Marker] Add stream mark:: Round end", on_hotkey_round_end_pressed)
 
-    marker_hotkey_end_id = obs.obs_hotkey_register_frontend("marker_end_hotkey", "[Local Stream Marker] Mark end", hotkey_end_pressed)
     local marker_hotkey_save_array = obs.obs_data_get_array(settings, "marker_hotkey")
     obs.obs_hotkey_load(marker_hotkey_id, marker_hotkey_save_array)	
     obs.obs_data_array_release(marker_hotkey_save_array)
-    local marker_hotkey_end_array = obs.obs_data_get_array(settings, "marker_end_hotkey")
-    obs.obs_hotkey_load(marker_hotkey_end_id, marker_hotkey_end_array)
-    obs.obs_data_array_release(marker_hotkey_end_array)
+
+    local marker_hotkey_cut_array = obs.obs_data_get_array(settings, "marker_hotkey_cut")
+    obs.obs_hotkey_load(marker_hotkey_cut_id, marker_hotkey_cut_array)
+    obs.obs_data_array_release(marker_hotkey_cut_array)
+
+    local marker_hotkey_round_start_array = obs.obs_data_get_array(settings, "marker_hotkey_round_start")
+    obs.obs_hotkey_load(marker_hotkey_round_start_id, marker_hotkey_round_start_array)
+    obs.obs_data_array_release(marker_hotkey_round_start_array)
+
+    local marker_hotkey_round_end_array = obs.obs_data_get_array(settings, "marker_hotkey_round_end")
+    obs.obs_hotkey_load(marker_hotkey_round_end_id, marker_hotkey_round_end_array)
+    obs.obs_data_array_release(marker_hotkey_round_end_array)
 end
